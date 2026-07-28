@@ -1,0 +1,27 @@
+version: '3.8'
+
+# Prod-shaped PostgreSQL for local validation before a real deploy — see
+# docs/adr/0001-sqlite-dev-postgresql-prod.md. Day-to-day dev and
+# `php artisan test` do NOT need this (they use SQLite). To try the app
+# against Postgres:
+#
+#   docker compose up -d
+#   # then in .env: DB_CONNECTION=pgsql, DB_HOST=127.0.0.1, DB_PORT=5432,
+#   #                DB_DATABASE=devon, DB_USERNAME=devon, DB_PASSWORD=devon
+#   php artisan migrate --seed
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: devon
+      POSTGRES_USER: devon
+      POSTGRES_PASSWORD: devon
+    ports:
+      - '5432:5432'
+    volumes:
+      - devon_postgres_data:/var/lib/postgresql/data
+
+volumes:
+  devon_postgres_data:
