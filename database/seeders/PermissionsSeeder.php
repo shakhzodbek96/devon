@@ -7,11 +7,12 @@ use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
 /**
- * Seeds the minimal permission set for the Auth & Roles slice
- * (PLAN_AUTH_ROLES.md §1.3) and assigns them:
+ * Seeds the permission set for the Auth & Roles slice (PLAN_AUTH_ROLES.md
+ * §1.3) plus the Phase A addition (PLAN_PHASE_AB.md §1.1):
  * - ROLE_SUPER_ADMIN → all permissions.
- * - ROLE_HR_ADMIN → user management (creates users) + roles.view.
- * - Every other role → no user-management permissions.
+ * - ROLE_HR_ADMIN → user management + roles.view + audit.view.
+ * - ROLE_AUDITOR → audit.view.
+ * - Every other role → no user-management/audit permissions.
  */
 class PermissionsSeeder extends Seeder
 {
@@ -21,6 +22,7 @@ class PermissionsSeeder extends Seeder
         'users.update',
         'users.deactivate',
         'roles.view',
+        'audit.view',
     ];
 
     public function run(): void
@@ -33,6 +35,9 @@ class PermissionsSeeder extends Seeder
         $superAdmin->syncPermissions(self::PERMISSIONS);
 
         $hrAdmin = Role::findByName('ROLE_HR_ADMIN', 'web');
-        $hrAdmin->syncPermissions(['users.view', 'users.create', 'users.update', 'roles.view']);
+        $hrAdmin->syncPermissions(['users.view', 'users.create', 'users.update', 'roles.view', 'audit.view']);
+
+        $auditor = Role::findByName('ROLE_AUDITOR', 'web');
+        $auditor->syncPermissions(['audit.view']);
     }
 }

@@ -7,6 +7,7 @@ use App\Http\Requests\ChangePasswordRequest;
 use App\Http\Requests\LoginRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Support\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -38,6 +39,8 @@ class AuthController extends Controller
 
         $token = $user->createToken('devon-dashboard')->plainTextToken;
 
+        AuditLogger::log($user, 'LOGIN', 'user', $user->uuid, $user->email);
+
         return response()->json([
             'token' => $token,
             'user' => new UserResource($user),
@@ -61,7 +64,10 @@ class AuthController extends Controller
      */
     public function logout(Request $request): Response
     {
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+        AuditLogger::log($user, 'LOGOUT', 'user', $user->uuid, $user->email);
+
+        $user->currentAccessToken()->delete();
 
         return response()->noContent();
     }
@@ -77,6 +83,8 @@ class AuthController extends Controller
             'must_change_password' => false,
             'password_changed_at' => now(),
         ]);
+
+        AuditLogger::log($user, 'PASSWORD_CHANGED', 'user', $user->uuid, $user->email);
 
         return response()->noContent();
     }

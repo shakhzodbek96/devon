@@ -7,6 +7,7 @@ use App\Http\Requests\StoreUserRequest;
 use App\Http\Requests\UpdateUserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Support\AuditLogger;
 use App\Support\PasswordGenerator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -60,6 +61,8 @@ class UserController extends Controller
 
         $user->syncRoles($data['roles']);
 
+        AuditLogger::log($request->user(), 'CREATE', 'user', $user->uuid, $user->full_name);
+
         $response = [
             'user' => new UserResource($user->fresh('roles')),
         ];
@@ -86,6 +89,8 @@ class UserController extends Controller
         if (isset($data['roles'])) {
             $user->syncRoles($data['roles']);
         }
+
+        AuditLogger::log($request->user(), 'UPDATE', 'user', $user->uuid, $user->full_name);
 
         return response()->json(new UserResource($user->fresh('roles')));
     }
