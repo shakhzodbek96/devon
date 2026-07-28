@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\UnitValidationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,5 +16,15 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Unit business-rule violations (PLAN_PHASE_AB.md §2.2) render as a
+        // 422 `{ code, message }` body — `code` matches the frontend mock's
+        // UnitValidationCode ('cycle' | 'duplicate-name' | 'max-depth' |
+        // 'invalid-parent') so src/lib/api/units.ts can rethrow the same
+        // `UnitValidationError` class the mock backend throws.
+        $exceptions->render(function (UnitValidationException $e) {
+            return response()->json([
+                'code' => $e->errorCode,
+                'message' => $e->getMessage(),
+            ], 422);
+        });
     })->create();

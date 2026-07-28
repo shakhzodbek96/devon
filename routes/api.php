@@ -4,13 +4,14 @@ use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\PositionController;
 use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Devon — Auth & Roles + Audit API (PLAN_AUTH_ROLES.md §1.5,
-| PLAN_PHASE_AB.md §1)
+| Devon — Auth & Roles + Audit/Units API (PLAN_AUTH_ROLES.md §1.5,
+| PLAN_PHASE_AB.md §1–2)
 |--------------------------------------------------------------------------
 |
 | Prefixed /api/v1. Sanctum token-based auth (Bearer) — the SPA runs on a
@@ -36,5 +37,11 @@ Route::prefix('v1')->group(function () {
         Route::get('/audit', [AuditController::class, 'index'])->middleware('can:audit.view');
 
         Route::get('/positions', [PositionController::class, 'index']);
+
+        Route::get('/units', [UnitController::class, 'index'])->middleware('can:units.view');
+        Route::get('/units/{uuid}', [UnitController::class, 'show'])->middleware('can:units.view');
+        Route::post('/units', [UnitController::class, 'store'])->middleware('can:units.create');
+        Route::patch('/units/{uuid}', [UnitController::class, 'update'])->middleware('can:units.update');
+        Route::delete('/units/{uuid}', [UnitController::class, 'destroy'])->middleware('can:units.update');
     });
 });
