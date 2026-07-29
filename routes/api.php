@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PositionController;
 use App\Http\Controllers\Api\ProfileChangeRequestController;
 use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
@@ -110,6 +111,22 @@ Route::prefix('v1')->group(function () {
         Route::post('/letters/{uuid}/accept', [LetterController::class, 'accept']);
         Route::post('/letters/{uuid}/sign', [LetterController::class, 'sign']);
         Route::post('/letters/{uuid}/dispatch', [LetterController::class, 'dispatch']);
+
+        // Task delegation / Kanban (PLAN_PHASE_H.md §3, BP-2 — the last
+        // mock module). No `can:` route middleware — every mutation acts
+        // as the authenticated user's own employee, and per-task
+        // authorization (assigner/assignee, subtree scope) is enforced
+        // inside `TaskService` itself, not by role.
+        Route::get('/tasks', [TaskController::class, 'index']);
+        Route::get('/tasks/{uuid}', [TaskController::class, 'show']);
+        Route::get('/me/task-stats', [TaskController::class, 'stats']);
+        Route::post('/tasks', [TaskController::class, 'store']);
+        Route::patch('/tasks/{uuid}', [TaskController::class, 'update']);
+        Route::post('/tasks/{uuid}/start', [TaskController::class, 'start']);
+        Route::post('/tasks/{uuid}/clarification-request', [TaskController::class, 'requestClarification']);
+        Route::post('/tasks/{uuid}/clarification-answer', [TaskController::class, 'answerClarification']);
+        Route::post('/tasks/{uuid}/submit', [TaskController::class, 'submit']);
+        Route::post('/tasks/{uuid}/review', [TaskController::class, 'review']);
 
         Route::get('/me/notifications', [NotificationController::class, 'index']);
         Route::post('/notifications/{uuid}/read', [NotificationController::class, 'markRead']);

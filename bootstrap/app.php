@@ -5,6 +5,7 @@ use App\Exceptions\CertificateValidationException;
 use App\Exceptions\DocumentValidationException;
 use App\Exceptions\EmployeeValidationException;
 use App\Exceptions\LetterValidationException;
+use App\Exceptions\TaskValidationException;
 use App\Exceptions\UnitValidationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -79,6 +80,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // (PLAN_PHASE_G.md §2) — same 422 `{ code, message }` shape, code
         // matches the frontend mock's LetterValidationCode.
         $exceptions->render(function (LetterValidationException $e) {
+            return response()->json([
+                'code' => $e->errorCode,
+                'message' => $e->getMessage(),
+            ], 422);
+        });
+
+        // Task business-rule / per-task authorization violations
+        // (PLAN_PHASE_H.md §2) — same 422 `{ code, message }` shape, code
+        // matches the frontend mock's TaskValidationCode.
+        $exceptions->render(function (TaskValidationException $e) {
             return response()->json([
                 'code' => $e->errorCode,
                 'message' => $e->getMessage(),
