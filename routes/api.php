@@ -51,6 +51,7 @@ Route::prefix('v1')->group(function () {
         Route::post('/employees', [EmployeeController::class, 'store'])->middleware('can:employees.create');
         Route::patch('/employees/{uuid}', [EmployeeController::class, 'update'])->middleware('can:employees.update');
         Route::post('/employees/{uuid}/terminate', [EmployeeController::class, 'terminate'])->middleware('can:employees.terminate');
+        Route::post('/employees/{uuid}/transfer', [EmployeeController::class, 'transfer'])->middleware('can:employees.update');
         Route::get('/employees/{uuid}/assignments', [EmployeeController::class, 'assignments'])->middleware('can:employees.view');
         Route::get('/validate/pinfl/{pinfl}', [EmployeeController::class, 'validatePinfl'])->middleware('can:employees.view');
 

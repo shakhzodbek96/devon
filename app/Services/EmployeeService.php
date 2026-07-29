@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Exceptions\AssignmentValidationException;
 use App\Exceptions\EmployeeValidationException;
 use App\Models\Assignment;
 use App\Models\Employee;
@@ -20,6 +21,9 @@ use Illuminate\Support\Str;
  */
 class EmployeeService
 {
+    /** Matches the frontend mock's `MAX_TOTAL_WORKLOAD_PERCENT` verbatim. */
+    public const MAX_TOTAL_WORKLOAD_PERCENT = 150;
+
     /**
      * `createEmployeeFull` — transactional user + employee + primary
      * assignment + role create. Every validation check runs BEFORE any
@@ -325,6 +329,109 @@ class EmployeeService
             );
 
             return $request->fresh();
+        });
+    }
+
+    /**
+     * `transferEmployee` (Flow 3) — ported verbatim from the frontend mock
+     * (frontend/dashboard/src/lib/mock-backend/index.ts, `transferEmployee`):
+     *
+     * - `carriedWorkload` = closeOldAssignment ? 0 : sum of the employee's
+     *   currently-active (no end_date) assignments' workloadPercent.
+     *   `carried + workloadPercent > 150` → `workload-exceeded`.
+     * - closeOldAssignment=true: every active assignment for the employee is
+     *   closed (`end_date = startDate`, `is_primary = false`).
+     * - Otherwise, type=PRIMARY: any existing open PRIMARY loses `is_primary`
+     *   so we never persist two open primaries.
+     * - New row's `is_primary = (type === PRIMARY || closeOldAssignment)`.
+     * - When the new row is primary, `employees.primary_unit_uuid` +
+     *   `position_id` are updated to match.
+     * - Audits `UNIT_TRANSFER` against the EMPLOYEE resource (distinct from
+     *   `UnitService::update`'s `UNIT_TRANSFER` against a UNIT resource when
+     *   a unit's own parent moves) with `changes: {unit, position}` +
+     *   `context: {assignmentType, workloadPercent, closedOld, reason}`.
+     *
+     * @param  array<string, mixed>  $input  Shape: newUnitUuid, newPositionId,
+     *   startDate, workloadPercent, type, closeOldAssignment, reason?.
+     */
+    public function transfer(string $employeeUuid, array $input, User $actor): Assignment
+    {
+        return DB::transaction(function () use ($employeeUuid, $input, $actor) {
+            $employee = Employee::where('uuid', $employeeUuid)->firstOrFail();
+
+            // Snapshot BEFORE any mutation — mirrors the mock's read-then-
+            // mutate ordering so the workload sum and the "previous primary"
+            // audit diff both reflect the pre-transfer state.
+            $activeForEmployee = Assignment::where('employee_uuid', $employeeUuid)
+                ->whereNull('end_date')
+                ->get();
+
+            $closeOld = (bool) $input['closeOldAssignment'];
+            $carriedWorkload = $closeOld
+                ? 0
+                : $activeForEmployee->sum('workload_percent');
+
+            if ($carriedWorkload + $input['workloadPercent'] > self::MAX_TOTAL_WORKLOAD_PERCENT) {
+                throw new AssignmentValidationException('workload-exceeded');
+            }
+
+            $previousPrimary = $activeForEmployee->first(fn (Assignment $a) => $a->is_primary);
+            $previousUnitUuid = $previousPrimary?->unit_uuid;
+            $previousPositionId = $previousPrimary?->position_id;
+
+            if ($closeOld) {
+                Assignment::where('employee_uuid', $employeeUuid)
+                    ->whereNull('end_date')
+                    ->update(['end_date' => $input['startDate'], 'is_primary' => false]);
+            } elseif ($input['type'] === 'PRIMARY') {
+                // Promoting a new PRIMARY while keeping the old row open —
+                // the old row must lose its `isPrimary` flag so we never
+                // persist two open primaries.
+                Assignment::where('employee_uuid', $employeeUuid)
+                    ->where('is_primary', true)
+                    ->whereNull('end_date')
+                    ->update(['is_primary' => false]);
+            }
+
+            $isPrimary = $input['type'] === 'PRIMARY' || $closeOld;
+
+            $newAssignment = Assignment::create([
+                'uuid' => (string) Str::uuid(),
+                'employee_uuid' => $employeeUuid,
+                'unit_uuid' => $input['newUnitUuid'],
+                'position_id' => $input['newPositionId'],
+                'is_primary' => $isPrimary,
+                'start_date' => $input['startDate'],
+                'workload_percent' => $input['workloadPercent'],
+                'type' => $input['type'],
+                'reason' => $input['reason'] ?? null,
+            ]);
+
+            if ($isPrimary) {
+                $employee->primary_unit_uuid = $input['newUnitUuid'];
+                $employee->position_id = $input['newPositionId'];
+                $employee->save();
+            }
+
+            AuditLogger::log(
+                $actor,
+                'UNIT_TRANSFER',
+                'employee',
+                $employeeUuid,
+                $employee->full_name_generated,
+                [
+                    'unit' => ['from' => $previousUnitUuid, 'to' => $input['newUnitUuid']],
+                    'position' => ['from' => $previousPositionId, 'to' => $input['newPositionId']],
+                ],
+                [
+                    'assignmentType' => $input['type'],
+                    'workloadPercent' => $input['workloadPercent'],
+                    'closedOld' => $closeOld,
+                    'reason' => $input['reason'] ?? null,
+                ],
+            );
+
+            return $newAssignment->fresh();
         });
     }
 }

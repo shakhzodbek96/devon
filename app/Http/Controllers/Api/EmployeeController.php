@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreEmployeeRequest;
 use App\Http\Requests\TerminateEmployeeRequest;
+use App\Http\Requests\TransferEmployeeRequest;
 use App\Http\Requests\UpdateEmployeeRequest;
 use App\Http\Resources\AssignmentResource;
 use App\Http\Resources\EmployeeResource;
@@ -100,6 +101,18 @@ class EmployeeController extends Controller
         $employee = $this->employees->terminate($uuid, $request->user(), $request->validated('orderExtract'));
 
         return response()->json(new EmployeeResource($employee));
+    }
+
+    /**
+     * POST /employees/{uuid}/transfer — gated by `employees.update`. Flow 3:
+     * workload-cap + primary-invariant transfer, matching the mock's
+     * `transferEmployee`.
+     */
+    public function transfer(TransferEmployeeRequest $request, string $uuid): JsonResponse
+    {
+        $assignment = $this->employees->transfer($uuid, $request->validated(), $request->user());
+
+        return response()->json(new AssignmentResource($assignment), 201);
     }
 
     /**

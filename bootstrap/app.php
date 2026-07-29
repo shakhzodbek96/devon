@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\AssignmentValidationException;
 use App\Exceptions\EmployeeValidationException;
 use App\Exceptions\UnitValidationException;
 use Illuminate\Foundation\Application;
@@ -35,6 +36,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // 'order-extract-missing' | 'position-instruction-missing' |
         // 'termination-extract-missing').
         $exceptions->render(function (EmployeeValidationException $e) {
+            return response()->json([
+                'code' => $e->errorCode,
+                'message' => $e->getMessage(),
+            ], 422);
+        });
+
+        // Assignment/transfer business-rule violations (PLAN_PHASE_D.md §1)
+        // — same 422 `{ code, message }` shape, code matches the frontend
+        // mock's AssignmentValidationCode ('workload-exceeded').
+        $exceptions->render(function (AssignmentValidationException $e) {
             return response()->json([
                 'code' => $e->errorCode,
                 'message' => $e->getMessage(),

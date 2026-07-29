@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Employee;
 use App\Models\Unit;
 use App\Models\User;
 use Database\Seeders\PermissionsSeeder;
@@ -227,6 +228,51 @@ it('returns 404 for a non-existent unit uuid', function () {
     $this->withHeader('Authorization', "Bearer {$token}")
         ->getJson('/api/v1/units/'.((string) Illuminate\Support\Str::uuid()))
         ->assertStatus(404);
+});
+
+it('assigns a real employee as unit head via PATCH headEmployeeUuid (no auto ROLE_UNIT_HEAD grant)', function () {
+    // PLAN_PHASE_D.md §2 — the mock never auto-grants ROLE_UNIT_HEAD when a
+    // unit's headEmployeeUuid is set (seed.ts only derives it from the
+    // holder's position at seed time; `updateUnit` itself does nothing
+    // role-related), so the backend mirrors that: PATCH persists the uuid
+    // only, no roles table write.
+    [$actor, $token] = unitsActingUser('ROLE_SUPER_ADMIN');
+
+    [, $unit] = createUnitViaApi($this, $token, ['nameUz' => 'Rahbarli Bo\'linma', 'code' => 'HEAD-01']);
+    $employee = Employee::factory()->create();
+
+    $response = $this->withHeader('Authorization', "Bearer {$token}")
+        ->patchJson("/api/v1/units/{$unit['uuid']}", ['headEmployeeUuid' => $employee->uuid]);
+
+    $response->assertOk()->assertJsonPath('headEmployeeUuid', $employee->uuid);
+    $this->assertDatabaseHas('structural_units', [
+        'uuid' => $unit['uuid'],
+        'head_employee_uuid' => $employee->uuid,
+    ]);
+
+    $employeeUser = User::factory()->create(['employee_uuid' => $employee->uuid]);
+    expect($employeeUser->fresh()->roles()->where('name', 'ROLE_UNIT_HEAD')->exists())->toBeFalse();
+
+    $this->assertDatabaseHas('audit_logs', [
+        'actor_uuid' => $actor->uuid,
+        'action' => 'UPDATE',
+        'resource_type' => 'unit',
+        'resource_uuid' => $unit['uuid'],
+    ]);
+});
+
+it('forbids ROLE_EMPLOYEE from setting a unit head (403)', function () {
+    // Built directly via the factory (no prior authenticated HTTP call) —
+    // Sanctum's guard memoizes the resolved user on the guard instance
+    // within one test, so making an admin request first and then switching
+    // tokens would still resolve as the admin (see EmployeesTest.php).
+    $unit = Unit::factory()->create();
+    $employee = Employee::factory()->create();
+
+    [, $token] = unitsActingUser('ROLE_EMPLOYEE');
+    $this->withHeader('Authorization', "Bearer {$token}")
+        ->patchJson("/api/v1/units/{$unit->uuid}", ['headEmployeeUuid' => $employee->uuid])
+        ->assertStatus(403);
 });
 
 it('allows ROLE_HR_ADMIN to create and update units', function () {
