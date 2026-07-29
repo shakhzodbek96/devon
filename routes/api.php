@@ -73,12 +73,12 @@ Route::prefix('v1')->group(function () {
         Route::post('/certificates/{uuid}/reject', [CertificateController::class, 'reject'])->middleware('can:certificates.manage');
         Route::post('/certificates/{uuid}/revoke', [CertificateController::class, 'revoke']);
 
-        // Documents + approval workflow + notifications (PLAN_PHASE_F1.md
-        // §3, milestone 2). No `can:` route middleware — every mutation
-        // acts as the authenticated user's own employee, and per-document
-        // authorization (creator/participant/recipient) is enforced inside
-        // `DocumentService` itself, not by role. ERI signing (SIGNED) is
-        // milestone F2 — there is no `sign` route here.
+        // Documents + approval workflow + ERI signing + notifications
+        // (PLAN_PHASE_F1.md §3, PLAN_PHASE_F2.md §2, milestone 2). No
+        // `can:` route middleware — every mutation acts as the
+        // authenticated user's own employee, and per-document authorization
+        // (creator/participant/recipient/signer) is enforced inside
+        // `DocumentService` itself, not by role.
         Route::get('/document-templates', [DocumentTemplateController::class, 'index']);
         Route::get('/documents', [DocumentController::class, 'index']);
         Route::get('/documents/{uuid}', [DocumentController::class, 'show']);
@@ -87,6 +87,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('/documents/{uuid}', [DocumentController::class, 'destroy']);
         Route::post('/documents/{uuid}/send-for-review', [DocumentController::class, 'sendForReview']);
         Route::post('/documents/{uuid}/decide', [DocumentController::class, 'decide']);
+        Route::post('/documents/{uuid}/sign', [DocumentController::class, 'sign']);
         Route::post('/documents/{uuid}/accept', [DocumentController::class, 'accept']);
         Route::post('/documents/{uuid}/email', [DocumentController::class, 'email']);
         Route::post('/documents/{uuid}/view', [DocumentController::class, 'recordView']);

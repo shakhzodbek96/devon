@@ -5,24 +5,26 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\DecideDocumentRequest;
 use App\Http\Requests\EmailDocumentRequest;
+use App\Http\Requests\SignDocumentRequest;
 use App\Http\Requests\StoreDocumentRequest;
 use App\Http\Requests\UpdateDocumentRequest;
 use App\Http\Resources\ApprovalStepResource;
 use App\Http\Resources\DocumentResource;
+use App\Http\Resources\SignatureResource;
 use App\Models\ApprovalStep;
 use App\Models\Document;
+use App\Models\Signature;
 use App\Services\DocumentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Documents + approval workflow (PLAN_PHASE_F1.md §3). Every mutation acts
- * as the AUTHENTICATED user's own employee — `actingEmployeeUuid()` below,
- * never a client-supplied uuid (privilege-escalation guard, PLAN_PHASE_F1.md
- * §0/§2). Per-document authorization (creator/participant/recipient checks)
- * lives in `DocumentService`, not here.
- *
- * ERI signing (SIGNED) is milestone F2 — there is no `sign` endpoint here.
+ * Documents + approval workflow + ERI signing (PLAN_PHASE_F1.md §3,
+ * PLAN_PHASE_F2.md §2). Every mutation acts as the AUTHENTICATED user's own
+ * employee — `actingEmployeeUuid()` below, never a client-supplied uuid
+ * (privilege-escalation guard, PLAN_PHASE_F1.md §0/§2). Per-document
+ * authorization (creator/participant/recipient/signer checks) lives in
+ * `DocumentService`, not here.
  */
 class DocumentController extends Controller
 {
@@ -71,8 +73,7 @@ class DocumentController extends Controller
 
     /**
      * GET /documents/{uuid} — document + all-rounds steps + signatures.
-     * `signatures` is always `[]` in F1 (the `signatures` table is F2 —
-     * PLAN_PHASE_F1.md §1/§2). Matches the mock's `getDocument`.
+     * Matches the mock's `getDocument`.
      */
     public function show(string $uuid): JsonResponse
     {
@@ -86,10 +87,15 @@ class DocumentController extends Controller
             ->orderBy('order_no')
             ->get();
 
+        $signatures = Signature::where('resource_type', 'document')
+            ->where('resource_uuid', $uuid)
+            ->orderByDesc('signed_at')
+            ->get();
+
         return response()->json([
             'document' => new DocumentResource($document),
             'steps' => ApprovalStepResource::collection($steps),
-            'signatures' => [],
+            'signatures' => SignatureResource::collection($signatures),
         ]);
     }
 
@@ -150,6 +156,25 @@ class DocumentController extends Controller
             $request->user(),
             $request->validated('decision'),
             $request->validated('comment'),
+        );
+
+        return response()->json(new DocumentResource($document));
+    }
+
+    /**
+     * POST /documents/{uuid}/sign — APPROVED → SIGNED (PLAN_PHASE_F2.md
+     * §2). `signatureHex` is the frontend's client-side fake ERI signature
+     * (BLOCKED(e-imzo) — see `DocumentService::sign`). Matches the mock's
+     * `signDocument`.
+     */
+    public function sign(SignDocumentRequest $request, string $uuid): JsonResponse
+    {
+        $document = $this->documents->sign(
+            $uuid,
+            $this->actingEmployeeUuid($request),
+            $request->user(),
+            $request->validated('certificateUuid'),
+            $request->validated('signatureHex'),
         );
 
         return response()->json(new DocumentResource($document));

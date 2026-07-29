@@ -4,9 +4,11 @@ namespace App\Services;
 
 use App\Exceptions\DocumentValidationException;
 use App\Models\ApprovalStep;
+use App\Models\Certificate;
 use App\Models\Document;
 use App\Models\DocumentTemplate;
 use App\Models\Employee;
+use App\Models\Signature;
 use App\Models\User;
 use App\Support\AuditLogger;
 use App\Support\TemplateRenderer;
@@ -14,20 +16,20 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Document workflow engine (PLAN_PHASE_F1.md §2), ported line-for-line from
- * the frontend mock's `createDocument` / `updateDraftDocument` /
- * `submitDocumentForReview` / `decideApproval` / `acceptDocument` /
- * `emailDocument` / `recordDocumentView` / `listMyApprovals`
- * (frontend/dashboard/src/lib/mock-backend/index.ts, ~1400–1900). Every
- * mutation validates against the *acting employee* uuid — the
- * authenticated user's own employee (never a client-supplied "act as
+ * Document workflow engine (PLAN_PHASE_F1.md §2, PLAN_PHASE_F2.md §2),
+ * ported line-for-line from the frontend mock's `createDocument` /
+ * `updateDraftDocument` / `submitDocumentForReview` / `decideApproval` /
+ * `signDocument` / `acceptDocument` / `emailDocument` / `recordDocumentView`
+ * / `listMyApprovals` (frontend/dashboard/src/lib/mock-backend/index.ts,
+ * ~1400–1900). Every mutation validates against the *acting employee* uuid
+ * — the authenticated user's own employee (never a client-supplied "act as
  * anyone"), resolved by `DocumentController` and passed in here.
  *
- * ERI signing (APPROVED → SIGNED, `signDocument`) is milestone F2 — NOT
- * built here. A document with a `signerUuid` set simply parks at APPROVED
- * once the approval chain clears; nothing in this service ever writes
- * SIGNED. The frontend hides/disables the "sign" action until F2 lands the
- * `signatures` table + mutation.
+ * ERI signing (APPROVED → SIGNED, `sign()`) requires an ACTIVE certificate
+ * owned by the document's `signerUuid`. BLOCKED(e-imzo): the `signatureHex`
+ * it persists is a client-generated fake — see PLAN_PHASE_F2.md §0. A
+ * document with a `signerUuid` set parks at APPROVED until `sign()` is
+ * called; signer-less documents close via `accept()` instead.
  */
 class DocumentService
 {
@@ -466,6 +468,82 @@ class DocumentService
     }
 
     /**
+     * `signDocument` — APPROVED → SIGNED. Policy (PLAN_PHASE_F2.md §2):
+     * document must be APPROVED (`wrong-status`); actor must be the
+     * document's `signerUuid` (`not-signer`); the chosen certificate must
+     * belong to the actor AND be ACTIVE (`cert-invalid`, folding "not
+     * found" / "not owned" / "not active" into one code exactly like the
+     * mock). Writes the `signatures` row, stamps `signedAt`/`archivedAt`
+     * (terminal status archives immediately, master §17), audits
+     * DOCUMENT_SIGNED, and notifies the creator + recipient.
+     *
+     * BLOCKED(e-imzo): `signatureHex` arrives from the frontend's
+     * client-side `FakeEriSigner.ts` — a random hex string, not a real
+     * PKCS#7 signature. The private key never reaches this server; only
+     * signature *metadata* is persisted here, and that persistence is real.
+     */
+    public function sign(
+        string $documentUuid,
+        string $actorEmployeeUuid,
+        User $actorUser,
+        string $certificateUuid,
+        string $signatureHex,
+    ): Document {
+        return DB::transaction(function () use ($documentUuid, $actorEmployeeUuid, $actorUser, $certificateUuid, $signatureHex) {
+            $document = Document::where('uuid', $documentUuid)->firstOrFail();
+            if ($document->status !== 'APPROVED') {
+                throw new DocumentValidationException('wrong-status');
+            }
+            if ($document->signer_uuid !== $actorEmployeeUuid) {
+                throw new DocumentValidationException('not-signer');
+            }
+
+            $cert = Certificate::where('uuid', $certificateUuid)->first();
+            if (! $cert || $cert->status !== 'ACTIVE' || $cert->employee_uuid !== $actorEmployeeUuid) {
+                throw new DocumentValidationException('cert-invalid');
+            }
+
+            Signature::create([
+                'uuid' => (string) Str::uuid(),
+                'resource_type' => 'document',
+                'resource_uuid' => $documentUuid,
+                'employee_uuid' => $actorEmployeeUuid,
+                'certificate_uuid' => $certificateUuid,
+                'algorithm' => 'RSA-PKCS7',
+                'signature_hex' => $signatureHex,
+                'signed_at' => now(),
+            ]);
+
+            // `archivedAt` stamps immediately: the TLH's nightly archive
+            // job is simulated by archiving the moment a terminal status
+            // lands (master §17), same as the mock.
+            $document->status = 'SIGNED';
+            $document->signed_at = now();
+            $document->archived_at = now();
+            $document->save();
+
+            $actorName = $actorUser->full_name;
+            $this->notifications->notifyDocument(
+                [$document->creator_uuid, $document->recipient_uuid],
+                'DOC_SIGNED',
+                $document->uuid,
+                ['docNumber' => $document->number, 'actorName' => $actorName],
+            );
+            AuditLogger::log(
+                $actorUser,
+                'DOCUMENT_SIGNED',
+                'document',
+                $documentUuid,
+                $this->label($document),
+                null,
+                ['certificateSerial' => $cert->serial_number],
+            );
+
+            return $document->fresh();
+        });
+    }
+
+    /**
      * The no-ERI branch (BPMN 3.4 node 11.2) — the recipient accepts an
      * APPROVED, signer-less document and it closes.
      */
@@ -582,8 +660,8 @@ class DocumentService
     /**
      * `listMyApprovals` — the acting employee's queue: PENDING decisions
      * (current round, current actionable step only), signature-pending
-     * (F2 — listed here for queue completeness even though `signDocument`
-     * isn't built), and acceptance-pending (signer-less APPROVED docs).
+     * (APPROVED docs where the actor is `signerUuid` — actioned via
+     * `sign()`), and acceptance-pending (signer-less APPROVED docs).
      *
      * @return array<int, array{kind: string, document: Document, step?: ApprovalStep}>
      */
