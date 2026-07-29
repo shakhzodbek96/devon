@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CertificateController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\PositionController;
 use App\Http\Controllers\Api\ProfileChangeRequestController;
@@ -58,5 +59,15 @@ Route::prefix('v1')->group(function () {
         Route::post('/me/profile-change-request', [ProfileChangeRequestController::class, 'store']);
         Route::get('/profile-change-requests', [ProfileChangeRequestController::class, 'index'])->middleware('can:employees.update');
         Route::post('/profile-change-requests/{uuid}/decide', [ProfileChangeRequestController::class, 'decide'])->middleware('can:employees.update');
+
+        // ERI Certificates (Flow 4, PLAN_PHASE_E.md §5). `revoke` has no
+        // `can:` middleware — the owner-or-`certificates.manage` check
+        // happens inside CertificateController::revoke itself.
+        Route::get('/certificates', [CertificateController::class, 'index'])->middleware('can:certificates.view');
+        Route::get('/me/certificates', [CertificateController::class, 'myCertificates']);
+        Route::post('/certificates', [CertificateController::class, 'store'])->middleware('can:certificates.upload');
+        Route::post('/certificates/{uuid}/approve', [CertificateController::class, 'approve'])->middleware('can:certificates.manage');
+        Route::post('/certificates/{uuid}/reject', [CertificateController::class, 'reject'])->middleware('can:certificates.manage');
+        Route::post('/certificates/{uuid}/revoke', [CertificateController::class, 'revoke']);
     });
 });

@@ -1,6 +1,7 @@
 <?php
 
 use App\Exceptions\AssignmentValidationException;
+use App\Exceptions\CertificateValidationException;
 use App\Exceptions\EmployeeValidationException;
 use App\Exceptions\UnitValidationException;
 use Illuminate\Foundation\Application;
@@ -46,6 +47,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // — same 422 `{ code, message }` shape, code matches the frontend
         // mock's AssignmentValidationCode ('workload-exceeded').
         $exceptions->render(function (AssignmentValidationException $e) {
+            return response()->json([
+                'code' => $e->errorCode,
+                'message' => $e->getMessage(),
+            ], 422);
+        });
+
+        // Certificate business-rule violations (PLAN_PHASE_E.md §2) — same
+        // 422 `{ code, message }` shape, code matches the frontend mock's
+        // CertificateValidationCode ('serial-taken' | 'pinfl-mismatch').
+        $exceptions->render(function (CertificateValidationException $e) {
             return response()->json([
                 'code' => $e->errorCode,
                 'message' => $e->getMessage(),

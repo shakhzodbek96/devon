@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Exceptions\AssignmentValidationException;
 use App\Exceptions\EmployeeValidationException;
 use App\Models\Assignment;
+use App\Models\Certificate;
 use App\Models\Employee;
 use App\Models\ProfileChangeRequest;
 use App\Models\User;
@@ -23,6 +24,10 @@ class EmployeeService
 {
     /** Matches the frontend mock's `MAX_TOTAL_WORKLOAD_PERCENT` verbatim. */
     public const MAX_TOTAL_WORKLOAD_PERCENT = 150;
+
+    public function __construct(private readonly CertificateService $certificates)
+    {
+    }
 
     /**
      * `createEmployeeFull` — transactional user + employee + primary
@@ -208,11 +213,12 @@ class EmployeeService
 
     /**
      * `terminateEmployee` — the certified termination-order extract is
-     * required. Flips the employee to TERMINATED only.
-     *
-     * TODO(phase-E): cascade cert revocation (mock's terminateEmployee
-     * revokes every ACTIVE certificate for the employee) — certificates are
-     * still mock-only in this phase.
+     * required. Flips the employee to TERMINATED, then cascades: every
+     * ACTIVE certificate belonging to the employee is revoked
+     * (`revocationReason = EMPLOYEE_TERMINATED`), each with its own
+     * `CERTIFICATE_REVOKED` audit entry, BEFORE the employee's own
+     * `UPDATE` audit entry — matches the mock's `terminateEmployee`
+     * cascade ordering verbatim (PLAN_PHASE_E.md §3).
      *
      * @param  array<string, mixed>|null  $orderExtract
      */
@@ -235,6 +241,12 @@ class EmployeeService
                 'uploadedAt' => $now->toIso8601String(),
             ];
             $employee->save();
+
+            // Cascade: revoke every ACTIVE certificate for this employee.
+            $activeCerts = Certificate::where('employee_uuid', $uuid)->where('status', 'ACTIVE')->get();
+            foreach ($activeCerts as $cert) {
+                $this->certificates->revoke($cert->uuid, 'EMPLOYEE_TERMINATED', $actor);
+            }
 
             AuditLogger::log(
                 $actor,
