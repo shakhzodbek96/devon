@@ -3,7 +3,10 @@
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CertificateController;
+use App\Http\Controllers\Api\DocumentController;
+use App\Http\Controllers\Api\DocumentTemplateController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PositionController;
 use App\Http\Controllers\Api\ProfileChangeRequestController;
 use App\Http\Controllers\Api\RoleController;
@@ -69,5 +72,28 @@ Route::prefix('v1')->group(function () {
         Route::post('/certificates/{uuid}/approve', [CertificateController::class, 'approve'])->middleware('can:certificates.manage');
         Route::post('/certificates/{uuid}/reject', [CertificateController::class, 'reject'])->middleware('can:certificates.manage');
         Route::post('/certificates/{uuid}/revoke', [CertificateController::class, 'revoke']);
+
+        // Documents + approval workflow + notifications (PLAN_PHASE_F1.md
+        // §3, milestone 2). No `can:` route middleware — every mutation
+        // acts as the authenticated user's own employee, and per-document
+        // authorization (creator/participant/recipient) is enforced inside
+        // `DocumentService` itself, not by role. ERI signing (SIGNED) is
+        // milestone F2 — there is no `sign` route here.
+        Route::get('/document-templates', [DocumentTemplateController::class, 'index']);
+        Route::get('/documents', [DocumentController::class, 'index']);
+        Route::get('/documents/{uuid}', [DocumentController::class, 'show']);
+        Route::post('/documents', [DocumentController::class, 'store']);
+        Route::patch('/documents/{uuid}', [DocumentController::class, 'update']);
+        Route::delete('/documents/{uuid}', [DocumentController::class, 'destroy']);
+        Route::post('/documents/{uuid}/send-for-review', [DocumentController::class, 'sendForReview']);
+        Route::post('/documents/{uuid}/decide', [DocumentController::class, 'decide']);
+        Route::post('/documents/{uuid}/accept', [DocumentController::class, 'accept']);
+        Route::post('/documents/{uuid}/email', [DocumentController::class, 'email']);
+        Route::post('/documents/{uuid}/view', [DocumentController::class, 'recordView']);
+        Route::get('/me/approvals', [DocumentController::class, 'myApprovals']);
+
+        Route::get('/me/notifications', [NotificationController::class, 'index']);
+        Route::post('/notifications/{uuid}/read', [NotificationController::class, 'markRead']);
+        Route::post('/me/notifications/read-all', [NotificationController::class, 'markAllRead']);
     });
 });

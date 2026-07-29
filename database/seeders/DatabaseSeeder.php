@@ -20,6 +20,9 @@ class DatabaseSeeder extends Seeder
             UnitsSeeder::class,
             EmployeesSeeder::class,
             CertificatesSeeder::class,
+            DocumentTemplatesSeeder::class,
+            DocumentsSeeder::class,
+            NotificationsSeeder::class,
         ]);
     }
 }

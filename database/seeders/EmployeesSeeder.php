@@ -36,6 +36,24 @@ class EmployeesSeeder extends Seeder
         'XODIM' => '00000000-0000-4000-8000-00000000a005',
     ];
 
+    /**
+     * Positions whose holder heads their unit — drives `head_employee_uuid`
+     * wiring (mirrors the mock's `HEAD_POSITION_IDS`,
+     * frontend/dashboard/src/lib/mock-backend/seed.ts). The POV switcher's
+     * `headedUnitUuids` (`src/lib/acting.ts`) and the M2 approval queues
+     * key off this — without it every `Unit.headEmployeeUuid` stays null
+     * against the real backend, breaking manager-gated UI (PLAN_PHASE_F1.md
+     * §0: "Units ham fasaddan").
+     */
+    private const HEAD_POSITION_IDS = [
+        'POS-DIR',
+        'POS-DEP-HEAD',
+        'POS-DIRECT-HEAD',
+        'POS-DIV-HEAD',
+        'POS-SUB-HEAD',
+        'POS-HR-MANAGER',
+    ];
+
     /** FIO catalogue. Index 0 is the HR_ADMIN (admin@devon.uz). */
     private const FIOS = [
         ['lastName' => 'Pulatov', 'firstName' => 'Asilbek', 'middleName' => 'Karimovich', 'gender' => 'M'],
@@ -219,6 +237,13 @@ class EmployeesSeeder extends Seeder
                 'type' => 'PRIMARY',
                 'created_at' => $hireDate,
             ]);
+
+            // Head-position holders head their unit. First holder wins — the
+            // seed never places two head positions in one unit.
+            if (in_array($assign['positionId'], self::HEAD_POSITION_IDS, true) && ! $unit->head_employee_uuid) {
+                $unit->head_employee_uuid = $employeeUuid;
+                $unit->save();
+            }
         }
     }
 

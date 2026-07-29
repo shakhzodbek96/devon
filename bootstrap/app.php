@@ -2,6 +2,7 @@
 
 use App\Exceptions\AssignmentValidationException;
 use App\Exceptions\CertificateValidationException;
+use App\Exceptions\DocumentValidationException;
 use App\Exceptions\EmployeeValidationException;
 use App\Exceptions\UnitValidationException;
 use Illuminate\Foundation\Application;
@@ -57,6 +58,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // 422 `{ code, message }` shape, code matches the frontend mock's
         // CertificateValidationCode ('serial-taken' | 'pinfl-mismatch').
         $exceptions->render(function (CertificateValidationException $e) {
+            return response()->json([
+                'code' => $e->errorCode,
+                'message' => $e->getMessage(),
+            ], 422);
+        });
+
+        // Document business-rule / per-document authorization violations
+        // (PLAN_PHASE_F1.md §2) — same 422 `{ code, message }` shape, code
+        // matches the frontend mock's DocumentValidationCode.
+        $exceptions->render(function (DocumentValidationException $e) {
             return response()->json([
                 'code' => $e->errorCode,
                 'message' => $e->getMessage(),
