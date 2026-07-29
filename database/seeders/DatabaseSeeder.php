@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             CertificatesSeeder::class,
             DocumentTemplatesSeeder::class,
             DocumentsSeeder::class,
+            LettersSeeder::class,
             NotificationsSeeder::class,
         ]);
     }

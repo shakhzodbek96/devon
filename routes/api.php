@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CertificateController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\DocumentTemplateController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\LetterController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\PositionController;
 use App\Http\Controllers\Api\ProfileChangeRequestController;
@@ -92,6 +93,23 @@ Route::prefix('v1')->group(function () {
         Route::post('/documents/{uuid}/email', [DocumentController::class, 'email']);
         Route::post('/documents/{uuid}/view', [DocumentController::class, 'recordView']);
         Route::get('/me/approvals', [DocumentController::class, 'myApprovals']);
+
+        // Incoming/outgoing correspondence (PLAN_PHASE_G.md §3, BPMN 3.3 /
+        // BP-3). No `can:` route middleware — every mutation acts as the
+        // authenticated user's own employee, and per-station authorization
+        // (Devonxona/Rahbar/unit-head/executor) is enforced inside
+        // `LetterService` itself, not by role. Letter signing reuses the
+        // shared `signatures` table (PLAN_PHASE_F2.md).
+        Route::get('/letters', [LetterController::class, 'index']);
+        Route::get('/letters/{uuid}', [LetterController::class, 'show']);
+        Route::post('/letters', [LetterController::class, 'store']);
+        Route::post('/letters/{uuid}/route', [LetterController::class, 'route']);
+        Route::post('/letters/{uuid}/assign', [LetterController::class, 'assign']);
+        Route::post('/letters/{uuid}/start', [LetterController::class, 'start']);
+        Route::post('/letters/{uuid}/execute', [LetterController::class, 'execute']);
+        Route::post('/letters/{uuid}/accept', [LetterController::class, 'accept']);
+        Route::post('/letters/{uuid}/sign', [LetterController::class, 'sign']);
+        Route::post('/letters/{uuid}/dispatch', [LetterController::class, 'dispatch']);
 
         Route::get('/me/notifications', [NotificationController::class, 'index']);
         Route::post('/notifications/{uuid}/read', [NotificationController::class, 'markRead']);
