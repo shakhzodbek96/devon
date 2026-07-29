@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\EmployeeValidationException;
 use App\Exceptions\UnitValidationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -22,6 +23,18 @@ return Application::configure(basePath: dirname(__DIR__))
         // 'invalid-parent') so src/lib/api/units.ts can rethrow the same
         // `UnitValidationError` class the mock backend throws.
         $exceptions->render(function (UnitValidationException $e) {
+            return response()->json([
+                'code' => $e->errorCode,
+                'message' => $e->getMessage(),
+            ], 422);
+        });
+
+        // Employee business-rule violations (PLAN_PHASE_C.md §2) — same
+        // 422 `{ code, message }` shape, code matches the frontend mock's
+        // EmployeeValidationCode ('pinfl-taken' | 'email-taken' |
+        // 'order-extract-missing' | 'position-instruction-missing' |
+        // 'termination-extract-missing').
+        $exceptions->render(function (EmployeeValidationException $e) {
             return response()->json([
                 'code' => $e->errorCode,
                 'message' => $e->getMessage(),
