@@ -7,6 +7,7 @@ use App\Exceptions\ConferenceBookingValidationException;
 use App\Exceptions\DocumentValidationException;
 use App\Exceptions\EmployeeValidationException;
 use App\Exceptions\LetterValidationException;
+use App\Exceptions\ProtocolValidationException;
 use App\Exceptions\TabelValidationException;
 use App\Exceptions\TaskValidationException;
 use App\Exceptions\UnitValidationException;
@@ -127,6 +128,20 @@ return Application::configure(basePath: dirname(__DIR__))
         // 'wrong-status' | 'not-authorized' | 'entries-incomplete' |
         // 'not-all-units-ready' | 'not-rahbar' | 'cert-invalid'.
         $exceptions->render(function (TabelValidationException $e) {
+            return response()->json([
+                'code' => $e->errorCode,
+                'message' => $e->getMessage(),
+            ], 422);
+        });
+
+        // Collegial body / protocol business-rule / per-station
+        // authorization violations (PLAN_kollegial-organ.md §3, §4) — same
+        // 422 `{ code, message }` shape. code: 'not-editable' |
+        // 'wrong-status' | 'not-authorized' | 'not-reviewer' |
+        // 'not-participant' | 'not-chairman' | 'already-decided' |
+        // 'already-signed' | 'quorum-not-met' | 'not-body-member' |
+        // 'cert-invalid'.
+        $exceptions->render(function (ProtocolValidationException $e) {
             return response()->json([
                 'code' => $e->errorCode,
                 'message' => $e->getMessage(),

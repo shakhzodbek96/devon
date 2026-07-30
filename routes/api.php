@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CertificateController;
+use App\Http\Controllers\Api\CollegialBodyController;
 use App\Http\Controllers\Api\ConferenceBookingController;
 use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\DocumentController;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OfficeNetworkController;
 use App\Http\Controllers\Api\PositionController;
 use App\Http\Controllers\Api\ProfileChangeRequestController;
+use App\Http\Controllers\Api\ProtocolController;
 use App\Http\Controllers\Api\RoleController;
 use App\Http\Controllers\Api\TabelController;
 use App\Http\Controllers\Api\TaskController;
@@ -182,6 +184,30 @@ Route::prefix('v1')->group(function () {
         Route::post('/tabels/{uuid}/head-decide', [TabelController::class, 'headDecide']);
         Route::post('/tabels/{uuid}/hr-decide', [TabelController::class, 'hrDecide']);
         Route::get('/tabel-registry/{period}', [TabelController::class, 'registry'])->middleware('can:attendance.view-registry');
+
+        // Kollegial organ — standing body registry (PLAN_kollegial-organ.md
+        // §2.2, §4). `index` open to all; CRUD + member management gated
+        // by `collegial.manage`.
+        Route::get('/collegial-bodies', [CollegialBodyController::class, 'index']);
+        Route::post('/collegial-bodies', [CollegialBodyController::class, 'store'])->middleware('can:collegial.manage');
+        Route::patch('/collegial-bodies/{uuid}', [CollegialBodyController::class, 'update'])->middleware('can:collegial.manage');
+        Route::delete('/collegial-bodies/{uuid}', [CollegialBodyController::class, 'destroy'])->middleware('can:collegial.manage');
+        Route::post('/collegial-bodies/{uuid}/members', [CollegialBodyController::class, 'addMember'])->middleware('can:collegial.manage');
+        Route::delete('/collegial-bodies/{uuid}/members/{employeeUuid}', [CollegialBodyController::class, 'removeMember'])->middleware('can:collegial.manage');
+
+        // Bayonnoma (protocol) approval chain (PLAN_kollegial-organ.md §1,
+        // §3, §4). No `can:` route middleware — secretary/reviewer/
+        // participant/chairman authorization is enforced inside
+        // `ProtocolService`.
+        Route::get('/protocols', [ProtocolController::class, 'index']);
+        Route::get('/protocols/{uuid}', [ProtocolController::class, 'show']);
+        Route::post('/collegial-bodies/{bodyUuid}/protocols', [ProtocolController::class, 'store']);
+        Route::patch('/protocols/{uuid}', [ProtocolController::class, 'update']);
+        Route::post('/protocols/{uuid}/submit', [ProtocolController::class, 'submit']);
+        Route::post('/protocols/{uuid}/reviewer-decide', [ProtocolController::class, 'reviewerDecide']);
+        Route::post('/protocols/{uuid}/member-sign', [ProtocolController::class, 'memberSign']);
+        Route::post('/protocols/{uuid}/member-decline', [ProtocolController::class, 'memberDecline']);
+        Route::post('/protocols/{uuid}/chairman-decide', [ProtocolController::class, 'chairmanDecide']);
 
         Route::get('/me/notifications', [NotificationController::class, 'index']);
         Route::post('/notifications/{uuid}/read', [NotificationController::class, 'markRead']);

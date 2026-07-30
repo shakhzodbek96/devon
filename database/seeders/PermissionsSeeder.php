@@ -20,6 +20,12 @@ use Spatie\Permission\Models\Role;
  * - ROLE_HR_OPERATOR / ROLE_UNIT_HEAD / ROLE_DEVONXONA → units.view +
  *   employees.view + certificates.view (read-only on certificates; they
  *   don't upload/manage).
+ *
+ * `collegial.manage` (PLAN_kollegial-organ.md §4) — SUPER_ADMIN + HR_ADMIN
+ * only; gates `CollegialBody` CRUD/member management. Protocol actions
+ * (create/submit/reviewer-decide/member-sign/chairman-decide) are NOT
+ * spatie-permission-gated — authorization is per-resource, enforced in
+ * `ProtocolService` (secretary/reviewer/participant/chairman role checks).
  */
 class PermissionsSeeder extends Seeder
 {
@@ -45,6 +51,7 @@ class PermissionsSeeder extends Seeder
         'attendance.manage',
         'attendance.view',
         'attendance.view-registry',
+        'collegial.manage',
     ];
 
     public function run(): void
@@ -64,6 +71,7 @@ class PermissionsSeeder extends Seeder
             'certificates.view', 'certificates.upload', 'certificates.manage',
             'conference-rooms.manage',
             'attendance.manage-config', 'attendance.manage', 'attendance.view', 'attendance.view-registry',
+            'collegial.manage',
         ]);
 
         $auditor = Role::findByName('ROLE_AUDITOR', 'web');

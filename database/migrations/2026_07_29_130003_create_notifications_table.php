@@ -25,7 +25,7 @@ return new class extends Migration
             $table->string('type');
             $table->string('title_key');
             $table->json('params');
-            $table->enum('resource_type', ['document', 'letter', 'task', 'tabel']);
+            $table->enum('resource_type', ['document', 'letter', 'task', 'tabel', 'protocol']);
             $table->uuid('resource_uuid');
             $table->boolean('is_read')->default(false);
             $table->timestamp('created_at')->useCurrent();

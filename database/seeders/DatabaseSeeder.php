@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
             LettersSeeder::class,
             TasksSeeder::class,
             ConferenceRoomsSeeder::class,
+            CollegialBodiesSeeder::class,
             WorkShiftsSeeder::class,
             OfficeNetworksSeeder::class,
             NotificationsSeeder::class,
