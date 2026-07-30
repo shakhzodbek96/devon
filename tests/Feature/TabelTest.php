@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AttendanceRecord;
 use App\Models\Certificate;
 use App\Models\Employee;
 use App\Models\Tabel;
@@ -305,4 +306,47 @@ it('gates the tabel-registry endpoint behind attendance.view-registry', function
 it('gates every tabel route behind authentication', function () {
     $this->getJson('/api/v1/tabels')->assertStatus(401);
     $this->postJson('/api/v1/tabels/generate')->assertStatus(401);
+});
+
+it('generates the requested month even when today is a day the target month does not have', function () {
+    $this->travelTo(Carbon::parse('2026-01-31 09:00:00'));
+
+    $f = tabelFixture();
+    $response = asTabel($this, $f['head'][1])->postJson('/api/v1/tabels/generate', [
+        'unitUuid' => $f['unit']->uuid,
+        'period' => '2026-02',
+    ])->assertStatus(201);
+
+    $dates = collect($response->json('entries'))->pluck('workDate');
+
+    expect($dates)->toHaveCount(28)
+        ->and($dates->min())->toBe('2026-02-01')
+        ->and($dates->max())->toBe('2026-02-28');
+
+    $this->travelBack();
+});
+
+it('returns the requested month of personal attendance even from a 31st', function () {
+    [, $token, $employee] = tabelActingUser();
+
+    $this->travelTo(Carbon::parse('2026-03-31 09:00:00'));
+
+    AttendanceRecord::create([
+        'uuid' => (string) Str::uuid(),
+        'employee_uuid' => $employee->uuid,
+        'work_date' => '2026-02-10',
+        'check_in_at' => now(),
+        'status' => 'OK',
+        'network_ok' => true,
+        'source' => 'SELF_CHECKIN',
+    ]);
+
+    $response = asTabel($this, $token)->getJson('/api/v1/attendance/me?month=2026-02')->assertOk();
+    expect($response->json())->toHaveCount(1)
+        ->and($response->json('0.workDate'))->toBe('2026-02-10');
+
+    // A garbage month must not 500.
+    asTabel($this, $token)->getJson('/api/v1/attendance/me?month=nonsense')->assertOk();
+
+    $this->travelBack();
 });

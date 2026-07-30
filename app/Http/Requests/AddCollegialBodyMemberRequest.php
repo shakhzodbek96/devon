@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class AddCollegialBodyMemberRequest extends FormRequest
 {
@@ -17,7 +18,7 @@ class AddCollegialBodyMemberRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'employeeUuid' => ['required', 'string', 'uuid'],
+            'employeeUuid' => ['required', 'string', 'uuid', Rule::exists('employees', 'uuid')->where('status', 'ACTIVE')],
         ];
     }
 }

@@ -442,3 +442,75 @@ it('rejects updating a non-editable protocol with not-editable', function () {
         ->assertStatus(422)
         ->assertJsonPath('code', 'not-editable');
 });
+
+it('resets member signatures when a bounced protocol is re-submitted', function () {
+    $ctx = protocolAtMembersStage($this);
+    $f = $ctx['fixture'];
+    $uuid = $ctx['protocolUuid'];
+
+    // Two of four members sign, the third declines -> MEMBERS_REJECTED.
+    foreach ([0, 1] as $i) {
+        $cert = Certificate::where('employee_uuid', $f['members'][$i][2]->uuid)->where('status', 'ACTIVE')->first();
+        asProtocol($this, $f['members'][$i][1])->postJson("/api/v1/protocols/{$uuid}/member-sign", [
+            'certificateUuid' => $cert->uuid,
+            'signatureHex' => bin2hex(random_bytes(16)),
+        ])->assertOk();
+    }
+    asProtocol($this, $f['members'][2][1])
+        ->postJson("/api/v1/protocols/{$uuid}/member-decline", ['note' => 'Roziman emas'])
+        ->assertOk();
+
+    // Secretary edits the agenda and re-submits.
+    asProtocol($this, $f['secretary'][1])->patchJson("/api/v1/protocols/{$uuid}", [
+        'agenda' => 'Tuzatilgan kun tartibi',
+    ])->assertOk();
+    asProtocol($this, $f['secretary'][1])->postJson("/api/v1/protocols/{$uuid}/submit")->assertOk();
+
+    // Every participant is PENDING again — nobody carries a signature over
+    // to the edited text.
+    $show = asProtocol($this, $f['secretary'][1])->getJson("/api/v1/protocols/{$uuid}")->assertOk();
+    expect(collect($show->json('participants'))->pluck('decision')->unique()->all())->toBe(['PENDING']);
+
+    // ...and the chain does NOT short-circuit to the chairman when only the
+    // previously-declining member signs.
+    foreach ($f['reviewers'] as $reviewer) {
+        asProtocol($this, $reviewer[1])
+            ->postJson("/api/v1/protocols/{$uuid}/reviewer-decide", ['approve' => true])
+            ->assertOk();
+    }
+    $cert = Certificate::where('employee_uuid', $f['members'][2][2]->uuid)->where('status', 'ACTIVE')->first();
+    $response = asProtocol($this, $f['members'][2][1])->postJson("/api/v1/protocols/{$uuid}/member-sign", [
+        'certificateUuid' => $cert->uuid,
+        'signatureHex' => bin2hex(random_bytes(16)),
+    ])->assertOk();
+    expect($response->json('status'))->toBe('SENT_TO_MEMBERS');
+});
+
+it('rejects protocol participants/reviewers who are not existing ACTIVE employees', function () {
+    $f = protocolFixture();
+    $memberUuids = collect($f['members'])->map(fn ($m) => $m[2]->uuid)->all();
+
+    [$response] = createProtocolViaApi($this, $f['secretary'][1], $f['body']->uuid, [
+        'participantUuids' => $memberUuids,
+        'reviewerUuids' => [(string) Str::uuid()],
+    ]);
+    $response->assertStatus(422)->assertJsonValidationErrors('reviewerUuids.0');
+
+    $terminated = Employee::factory()->create(['status' => 'TERMINATED']);
+    [$response2] = createProtocolViaApi($this, $f['secretary'][1], $f['body']->uuid, [
+        'participantUuids' => $memberUuids,
+        'reviewerUuids' => [$terminated->uuid],
+    ]);
+    $response2->assertStatus(422)->assertJsonValidationErrors('reviewerUuids.0');
+});
+
+it('refuses to create a protocol on an ARCHIVED collegial body', function () {
+    $f = protocolFixture();
+    $f['body']->update(['status' => 'ARCHIVED']);
+
+    [$response] = createProtocolViaApi($this, $f['secretary'][1], $f['body']->uuid, [
+        'participantUuids' => collect($f['members'])->map(fn ($m) => $m[2]->uuid)->all(),
+    ]);
+
+    $response->assertStatus(422)->assertJsonPath('code', 'not-authorized');
+});

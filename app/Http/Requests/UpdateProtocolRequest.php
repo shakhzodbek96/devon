@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * `PATCH /protocols/{uuid}` — structural validation only. `not-editable`,
@@ -26,9 +27,9 @@ class UpdateProtocolRequest extends FormRequest
             'templateKey' => ['sometimes', 'required', 'string', 'max:255'],
             'agenda' => ['sometimes', 'required', 'string'],
             'participantUuids' => ['sometimes', 'array', 'min:1'],
-            'participantUuids.*' => ['string', 'uuid'],
+            'participantUuids.*' => ['string', 'uuid', Rule::exists('employees', 'uuid')->where('status', 'ACTIVE')],
             'reviewerUuids' => ['sometimes', 'array'],
-            'reviewerUuids.*' => ['string', 'uuid'],
+            'reviewerUuids.*' => ['string', 'uuid', Rule::exists('employees', 'uuid')->where('status', 'ACTIVE')],
         ];
     }
 }

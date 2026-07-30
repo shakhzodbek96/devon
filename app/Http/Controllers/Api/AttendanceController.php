@@ -57,7 +57,12 @@ class AttendanceController extends Controller
     public function me(Request $request): JsonResponse
     {
         $employee = $this->actingEmployee($request);
-        $month = $request->query('month') ?: now()->format('Y-m');
+        // Guard the free-form query param: an unparseable value would blow up
+        // Carbon inside the service with a 500 instead of a clean response.
+        $month = (string) ($request->query('month') ?: '');
+        if (! preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $month)) {
+            $month = now()->format('Y-m');
+        }
 
         return response()->json(AttendanceRecordResource::collection(
             $this->attendance->myHistory($employee->uuid, $month),

@@ -22,7 +22,7 @@ class ManualAttendanceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'employeeUuid' => ['required', 'string', 'uuid'],
+            'employeeUuid' => ['required', 'string', 'uuid', Rule::exists('employees', 'uuid')],
             'workDate' => ['required', 'date'],
             'checkInAt' => ['nullable', 'date'],
             'checkOutAt' => ['nullable', 'date'],

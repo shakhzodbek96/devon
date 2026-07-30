@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreCollegialBodyRequest extends FormRequest
 {
@@ -18,11 +19,11 @@ class StoreCollegialBodyRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'chairmanEmployeeUuid' => ['required', 'string', 'uuid'],
-            'secretaryEmployeeUuid' => ['required', 'string', 'uuid'],
+            'chairmanEmployeeUuid' => ['required', 'string', 'uuid', Rule::exists('employees', 'uuid')->where('status', 'ACTIVE')],
+            'secretaryEmployeeUuid' => ['required', 'string', 'uuid', Rule::exists('employees', 'uuid')->where('status', 'ACTIVE')],
             'quorumMin' => ['required', 'integer', 'min:1'],
             'memberEmployeeUuids' => ['sometimes', 'array'],
-            'memberEmployeeUuids.*' => ['string', 'uuid'],
+            'memberEmployeeUuids.*' => ['string', 'uuid', Rule::exists('employees', 'uuid')->where('status', 'ACTIVE')],
         ];
     }
 }

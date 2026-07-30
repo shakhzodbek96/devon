@@ -190,8 +190,12 @@ class AttendanceService
      */
     public function myHistory(string $employeeUuid, string $month): Collection
     {
-        $start = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->format('Y-m-d');
-        $end = Carbon::createFromFormat('Y-m', $month)->endOfMonth()->format('Y-m-d');
+        // Anchor on day 1 — `createFromFormat('Y-m', ...)` fills the missing
+        // day from *today*, so asking for "2026-02" on the 31st overflows
+        // into March and returns the WRONG month's records.
+        $anchor = Carbon::createFromFormat('Y-m-d', $month.'-01')->startOfDay();
+        $start = $anchor->format('Y-m-d');
+        $end = $anchor->copy()->endOfMonth()->format('Y-m-d');
 
         return AttendanceRecord::where('employee_uuid', $employeeUuid)
             ->whereBetween('work_date', [$start, $end])

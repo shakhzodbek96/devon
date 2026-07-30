@@ -54,7 +54,12 @@ class ConferenceBookingService
     public function create(array $input, string $actorEmployeeUuid, User $actorUser): ConferenceBooking
     {
         return DB::transaction(function () use ($input, $actorEmployeeUuid, $actorUser) {
-            $room = ConferenceRoom::where('uuid', $input['roomUuid'])->first();
+            // `lockForUpdate` serializes concurrent bookings of the SAME room:
+            // without it the overlap check below and the insert that follows
+            // form a check-then-act race, and there is no DB-level exclusion
+            // constraint to catch the double booking (SQLite cannot express
+            // one). No-op on SQLite (single writer), real on Postgres.
+            $room = ConferenceRoom::where('uuid', $input['roomUuid'])->lockForUpdate()->first();
             if (! $room) {
                 throw new ConferenceBookingValidationException('invalid-room');
             }

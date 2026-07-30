@@ -54,6 +54,12 @@ class ProtocolService
             if (! $this->isSecretaryOrManager($body, $actorUser)) {
                 throw new ProtocolValidationException('not-authorized');
             }
+            // An ARCHIVED body must not accept new protocols — otherwise
+            // `archive()` is decorative (same rule as
+            // `ConferenceBookingService::create`'s `room-archived`).
+            if ($body->status !== 'ACTIVE') {
+                throw new ProtocolValidationException('not-authorized');
+            }
 
             $participantUuids = array_values(array_unique($input['participantUuids'] ?? []));
             $this->assertRosterAndQuorum($body, $participantUuids);
@@ -86,7 +92,7 @@ class ProtocolService
     public function update(string $protocolUuid, array $patch, User $actorUser): Protocol
     {
         return DB::transaction(function () use ($protocolUuid, $patch, $actorUser) {
-            $protocol = Protocol::where('uuid', $protocolUuid)->firstOrFail();
+            $protocol = Protocol::where('uuid', $protocolUuid)->lockForUpdate()->firstOrFail();
 
             if (! in_array($protocol->status, self::EDITABLE_STATUSES, true)) {
                 throw new ProtocolValidationException('not-editable');
@@ -130,7 +136,7 @@ class ProtocolService
     public function submitForReview(string $protocolUuid, User $actorUser): Protocol
     {
         return DB::transaction(function () use ($protocolUuid, $actorUser) {
-            $protocol = Protocol::where('uuid', $protocolUuid)->firstOrFail();
+            $protocol = Protocol::where('uuid', $protocolUuid)->lockForUpdate()->firstOrFail();
 
             if (! in_array($protocol->status, self::EDITABLE_STATUSES, true)) {
                 throw new ProtocolValidationException('wrong-status');
@@ -147,9 +153,26 @@ class ProtocolService
                 'decided_at' => null,
             ]);
 
+            // Member decisions must reset too. Re-submitting happens after a
+            // MEMBERS_REJECTED/CHAIRMAN_REJECTED bounce, where the secretary
+            // has just EDITED the agenda — keeping the previous round's
+            // SIGNED rows would credit those members with an ERI signature on
+            // text they never saw (and let the protocol auto-advance to the
+            // chairman as soon as the single declining member re-signs).
+            // The `signatures` rows themselves stay — they are append-only
+            // audit history; a new round writes new ones.
+            ProtocolParticipant::where('protocol_uuid', $protocolUuid)->update([
+                'decision' => 'PENDING',
+                'note' => null,
+                'decided_at' => null,
+            ]);
+
             $protocol->status = 'SENT_FOR_REVIEW';
             $protocol->submitted_at = now();
+            $protocol->members_completed_at = null;
+            $protocol->chairman_signed_at = null;
             $protocol->review_note = null;
+            $protocol->chairman_note = null;
             $protocol->save();
 
             foreach ($protocol->reviewers()->pluck('employee_uuid') as $reviewerUuid) {
@@ -177,7 +200,7 @@ class ProtocolService
         ?string $note,
     ): Protocol {
         return DB::transaction(function () use ($protocolUuid, $actorEmployeeUuid, $actorUser, $approve, $note) {
-            $protocol = Protocol::where('uuid', $protocolUuid)->firstOrFail();
+            $protocol = Protocol::where('uuid', $protocolUuid)->lockForUpdate()->firstOrFail();
 
             if ($protocol->status !== 'SENT_FOR_REVIEW') {
                 throw new ProtocolValidationException('wrong-status');
@@ -249,7 +272,7 @@ class ProtocolService
         ?string $signatureHex,
     ): Protocol {
         return DB::transaction(function () use ($protocolUuid, $actorEmployeeUuid, $actorUser, $certificateUuid, $signatureHex) {
-            $protocol = Protocol::where('uuid', $protocolUuid)->firstOrFail();
+            $protocol = Protocol::where('uuid', $protocolUuid)->lockForUpdate()->firstOrFail();
 
             if ($protocol->status !== 'SENT_TO_MEMBERS') {
                 throw new ProtocolValidationException('wrong-status');
@@ -324,7 +347,7 @@ class ProtocolService
         ?string $note,
     ): Protocol {
         return DB::transaction(function () use ($protocolUuid, $actorEmployeeUuid, $actorUser, $note) {
-            $protocol = Protocol::where('uuid', $protocolUuid)->firstOrFail();
+            $protocol = Protocol::where('uuid', $protocolUuid)->lockForUpdate()->firstOrFail();
 
             if ($protocol->status !== 'SENT_TO_MEMBERS') {
                 throw new ProtocolValidationException('wrong-status');
@@ -366,7 +389,7 @@ class ProtocolService
         ?string $note,
     ): Protocol {
         return DB::transaction(function () use ($protocolUuid, $actorEmployeeUuid, $actorUser, $approve, $certificateUuid, $signatureHex, $note) {
-            $protocol = Protocol::where('uuid', $protocolUuid)->firstOrFail();
+            $protocol = Protocol::where('uuid', $protocolUuid)->lockForUpdate()->firstOrFail();
 
             $body = CollegialBody::where('uuid', $protocol->collegial_body_uuid)->first();
             if (! $body || $body->chairman_employee_uuid !== $actorEmployeeUuid) {

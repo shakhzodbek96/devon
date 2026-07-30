@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * `POST /collegial-bodies/{bodyUuid}/protocols` — structural validation
@@ -27,9 +28,9 @@ class StoreProtocolRequest extends FormRequest
             'templateKey' => ['required', 'string', 'max:255'],
             'agenda' => ['required', 'string'],
             'participantUuids' => ['required', 'array', 'min:1'],
-            'participantUuids.*' => ['string', 'uuid'],
+            'participantUuids.*' => ['string', 'uuid', Rule::exists('employees', 'uuid')->where('status', 'ACTIVE')],
             'reviewerUuids' => ['sometimes', 'array'],
-            'reviewerUuids.*' => ['string', 'uuid'],
+            'reviewerUuids.*' => ['string', 'uuid', Rule::exists('employees', 'uuid')->where('status', 'ACTIVE')],
         ];
     }
 }

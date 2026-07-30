@@ -74,7 +74,10 @@ class TabelService
             ]);
 
             $employees = Employee::where('primary_unit_uuid', $unitUuid)->where('status', 'ACTIVE')->get();
-            $start = Carbon::createFromFormat('Y-m', $period)->startOfMonth();
+            // `createFromFormat('Y-m', ...)` fills the missing day from
+            // *today*, so generating "2026-02" on the 31st overflows into
+            // March before `startOfMonth()` ever runs. Anchor on day 1.
+            $start = Carbon::createFromFormat('Y-m-d', $period.'-01')->startOfDay();
             $end = $start->copy()->endOfMonth();
 
             foreach ($employees as $employee) {
@@ -117,7 +120,7 @@ class TabelService
     public function updateEntries(string $tabelUuid, array $entries, User $actorUser): Tabel
     {
         return DB::transaction(function () use ($tabelUuid, $entries, $actorUser) {
-            $tabel = Tabel::where('uuid', $tabelUuid)->firstOrFail();
+            $tabel = Tabel::where('uuid', $tabelUuid)->lockForUpdate()->firstOrFail();
 
             if (! in_array($tabel->status, self::EDITABLE_STATUSES, true)) {
                 throw new TabelValidationException('not-editable');
@@ -152,7 +155,7 @@ class TabelService
     public function submitToHead(string $tabelUuid, User $actorUser): Tabel
     {
         return DB::transaction(function () use ($tabelUuid, $actorUser) {
-            $tabel = Tabel::where('uuid', $tabelUuid)->firstOrFail();
+            $tabel = Tabel::where('uuid', $tabelUuid)->lockForUpdate()->firstOrFail();
 
             if (! in_array($tabel->status, self::EDITABLE_STATUSES, true)) {
                 throw new TabelValidationException('wrong-status');
@@ -209,7 +212,7 @@ class TabelService
         ?string $note,
     ): Tabel {
         return DB::transaction(function () use ($tabelUuid, $certificateUuid, $signatureHex, $actorUser, $actorEmployeeUuid, $approve, $note) {
-            $tabel = Tabel::where('uuid', $tabelUuid)->firstOrFail();
+            $tabel = Tabel::where('uuid', $tabelUuid)->lockForUpdate()->firstOrFail();
 
             if ($tabel->status !== 'SENT_TO_HEAD') {
                 throw new TabelValidationException('wrong-status');
@@ -266,7 +269,7 @@ class TabelService
     public function hrDecide(string $tabelUuid, User $actorUser, bool $approve, ?string $note): Tabel
     {
         return DB::transaction(function () use ($tabelUuid, $actorUser, $approve, $note) {
-            $tabel = Tabel::where('uuid', $tabelUuid)->firstOrFail();
+            $tabel = Tabel::where('uuid', $tabelUuid)->lockForUpdate()->firstOrFail();
 
             if ($tabel->status !== 'SENT_TO_HR') {
                 throw new TabelValidationException('wrong-status');

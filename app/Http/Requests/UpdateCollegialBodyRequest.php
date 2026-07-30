@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use Illuminate\Validation\Rule;
+
 class UpdateCollegialBodyRequest extends StoreCollegialBodyRequest
 {
     /**
@@ -11,8 +13,8 @@ class UpdateCollegialBodyRequest extends StoreCollegialBodyRequest
     {
         return [
             'name' => ['sometimes', 'required', 'string', 'max:255'],
-            'chairmanEmployeeUuid' => ['sometimes', 'required', 'string', 'uuid'],
-            'secretaryEmployeeUuid' => ['sometimes', 'required', 'string', 'uuid'],
+            'chairmanEmployeeUuid' => ['sometimes', 'required', 'string', 'uuid', Rule::exists('employees', 'uuid')->where('status', 'ACTIVE')],
+            'secretaryEmployeeUuid' => ['sometimes', 'required', 'string', 'uuid', Rule::exists('employees', 'uuid')->where('status', 'ACTIVE')],
             'quorumMin' => ['sometimes', 'required', 'integer', 'min:1'],
         ];
     }
