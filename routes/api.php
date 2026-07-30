@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CertificateController;
@@ -10,12 +11,15 @@ use App\Http\Controllers\Api\DocumentTemplateController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\LetterController;
 use App\Http\Controllers\Api\NotificationController;
+use App\Http\Controllers\Api\OfficeNetworkController;
 use App\Http\Controllers\Api\PositionController;
 use App\Http\Controllers\Api\ProfileChangeRequestController;
 use App\Http\Controllers\Api\RoleController;
+use App\Http\Controllers\Api\TabelController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\UnitController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\WorkShiftController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -143,6 +147,41 @@ Route::prefix('v1')->group(function () {
         Route::get('/conference-bookings', [ConferenceBookingController::class, 'index']);
         Route::post('/conference-bookings', [ConferenceBookingController::class, 'store']);
         Route::post('/conference-bookings/{uuid}/cancel', [ConferenceBookingController::class, 'cancel']);
+
+        // Tabel / Davomat — Wi-Fi perimeter config + work shifts (admin
+        // CRUD, PLAN_tabel-davomat.md §3), gated by `attendance.manage-config`.
+        Route::get('/office-networks', [OfficeNetworkController::class, 'index'])->middleware('can:attendance.manage-config');
+        Route::post('/office-networks', [OfficeNetworkController::class, 'store'])->middleware('can:attendance.manage-config');
+        Route::patch('/office-networks/{uuid}', [OfficeNetworkController::class, 'update'])->middleware('can:attendance.manage-config');
+        Route::delete('/office-networks/{uuid}', [OfficeNetworkController::class, 'destroy'])->middleware('can:attendance.manage-config');
+
+        Route::get('/work-shifts', [WorkShiftController::class, 'index'])->middleware('can:attendance.manage-config');
+        Route::post('/work-shifts', [WorkShiftController::class, 'store'])->middleware('can:attendance.manage-config');
+        Route::patch('/work-shifts/{uuid}', [WorkShiftController::class, 'update'])->middleware('can:attendance.manage-config');
+        Route::delete('/work-shifts/{uuid}', [WorkShiftController::class, 'destroy'])->middleware('can:attendance.manage-config');
+
+        // Daily check-in/check-out (PLAN_tabel-davomat.md §3). check-in/
+        // check-out/me act as the authenticated user's own employee — no
+        // `can:` middleware, everyone checks themselves in.
+        Route::post('/attendance/check-in', [AttendanceController::class, 'checkIn']);
+        Route::post('/attendance/check-out', [AttendanceController::class, 'checkOut']);
+        Route::get('/attendance/me', [AttendanceController::class, 'me']);
+        Route::get('/attendance', [AttendanceController::class, 'index'])->middleware('can:attendance.view');
+        Route::post('/attendance/manual', [AttendanceController::class, 'manual'])->middleware('can:attendance.manage');
+
+        // Monthly timesheet approval chain (PLAN_tabel-davomat.md §1, §3).
+        // No `can:` route middleware on generate/entries/submit/head-decide/
+        // hr-decide — per-tabel authorization (unit head / HR) is enforced
+        // inside `TabelService`. `tabel-registry` is Accounting's
+        // cross-unit view, gated by `attendance.view-registry`.
+        Route::get('/tabels', [TabelController::class, 'index']);
+        Route::get('/tabels/{uuid}', [TabelController::class, 'show']);
+        Route::post('/tabels/generate', [TabelController::class, 'generate']);
+        Route::patch('/tabels/{uuid}/entries', [TabelController::class, 'updateEntries']);
+        Route::post('/tabels/{uuid}/submit', [TabelController::class, 'submit']);
+        Route::post('/tabels/{uuid}/head-decide', [TabelController::class, 'headDecide']);
+        Route::post('/tabels/{uuid}/hr-decide', [TabelController::class, 'hrDecide']);
+        Route::get('/tabel-registry/{period}', [TabelController::class, 'registry'])->middleware('can:attendance.view-registry');
 
         Route::get('/me/notifications', [NotificationController::class, 'index']);
         Route::post('/notifications/{uuid}/read', [NotificationController::class, 'markRead']);

@@ -41,6 +41,10 @@ class PermissionsSeeder extends Seeder
         'certificates.upload',
         'certificates.manage',
         'conference-rooms.manage',
+        'attendance.manage-config',
+        'attendance.manage',
+        'attendance.view',
+        'attendance.view-registry',
     ];
 
     public function run(): void
@@ -59,10 +63,11 @@ class PermissionsSeeder extends Seeder
             'employees.view', 'employees.create', 'employees.update', 'employees.terminate',
             'certificates.view', 'certificates.upload', 'certificates.manage',
             'conference-rooms.manage',
+            'attendance.manage-config', 'attendance.manage', 'attendance.view', 'attendance.view-registry',
         ]);
 
         $auditor = Role::findByName('ROLE_AUDITOR', 'web');
-        $auditor->syncPermissions(['audit.view', 'units.view', 'employees.view', 'certificates.view']);
+        $auditor->syncPermissions(['audit.view', 'units.view', 'employees.view', 'certificates.view', 'attendance.view']);
 
         $employee = Role::findByName('ROLE_EMPLOYEE', 'web');
         $employee->syncPermissions(['units.view', 'employees.view', 'certificates.view', 'certificates.upload']);

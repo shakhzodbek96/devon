@@ -1,11 +1,13 @@
 <?php
 
 use App\Exceptions\AssignmentValidationException;
+use App\Exceptions\AttendanceValidationException;
 use App\Exceptions\CertificateValidationException;
 use App\Exceptions\ConferenceBookingValidationException;
 use App\Exceptions\DocumentValidationException;
 use App\Exceptions\EmployeeValidationException;
 use App\Exceptions\LetterValidationException;
+use App\Exceptions\TabelValidationException;
 use App\Exceptions\TaskValidationException;
 use App\Exceptions\UnitValidationException;
 use Illuminate\Foundation\Application;
@@ -102,6 +104,29 @@ return Application::configure(basePath: dirname(__DIR__))
         // code matches the planned frontend ConferenceBookingValidationCode
         // ('time-conflict' | 'invalid-room' | 'room-archived' | 'invalid-range').
         $exceptions->render(function (ConferenceBookingValidationException $e) {
+            return response()->json([
+                'code' => $e->errorCode,
+                'message' => $e->getMessage(),
+            ], 422);
+        });
+
+        // Attendance (daily check-in/check-out) business-rule violations
+        // (PLAN_tabel-davomat.md §2, §3) — same 422 `{ code, message }`
+        // shape. code: 'network-blocked' | 'already-checked-in' |
+        // 'already-closed'.
+        $exceptions->render(function (AttendanceValidationException $e) {
+            return response()->json([
+                'code' => $e->errorCode,
+                'message' => $e->getMessage(),
+            ], 422);
+        });
+
+        // Tabel (monthly timesheet) business-rule / per-station
+        // authorization violations (PLAN_tabel-davomat.md §1, §3) — same
+        // 422 `{ code, message }` shape. code: 'not-editable' |
+        // 'wrong-status' | 'not-authorized' | 'entries-incomplete' |
+        // 'not-all-units-ready' | 'not-rahbar' | 'cert-invalid'.
+        $exceptions->render(function (TabelValidationException $e) {
             return response()->json([
                 'code' => $e->errorCode,
                 'message' => $e->getMessage(),

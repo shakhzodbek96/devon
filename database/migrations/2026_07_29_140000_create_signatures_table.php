@@ -32,7 +32,7 @@ return new class extends Migration
         Schema::create('signatures', function (Blueprint $table) {
             $table->id();
             $table->uuid('uuid')->unique();
-            $table->enum('resource_type', ['document', 'letter']);
+            $table->enum('resource_type', ['document', 'letter', 'tabel']);
             $table->uuid('resource_uuid')->index();
             $table->uuid('employee_uuid')->index();
             $table->uuid('certificate_uuid');
