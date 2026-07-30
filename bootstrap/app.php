@@ -2,6 +2,7 @@
 
 use App\Exceptions\AssignmentValidationException;
 use App\Exceptions\CertificateValidationException;
+use App\Exceptions\ConferenceBookingValidationException;
 use App\Exceptions\DocumentValidationException;
 use App\Exceptions\EmployeeValidationException;
 use App\Exceptions\LetterValidationException;
@@ -90,6 +91,17 @@ return Application::configure(basePath: dirname(__DIR__))
         // (PLAN_PHASE_H.md §2) — same 422 `{ code, message }` shape, code
         // matches the frontend mock's TaskValidationCode.
         $exceptions->render(function (TaskValidationException $e) {
+            return response()->json([
+                'code' => $e->errorCode,
+                'message' => $e->getMessage(),
+            ], 422);
+        });
+
+        // Conference-room booking business-rule violations
+        // (PLAN_conference-room.md §3) — same 422 `{ code, message }` shape,
+        // code matches the planned frontend ConferenceBookingValidationCode
+        // ('time-conflict' | 'invalid-room' | 'room-archived' | 'invalid-range').
+        $exceptions->render(function (ConferenceBookingValidationException $e) {
             return response()->json([
                 'code' => $e->errorCode,
                 'message' => $e->getMessage(),

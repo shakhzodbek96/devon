@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
             DocumentsSeeder::class,
             LettersSeeder::class,
             TasksSeeder::class,
+            ConferenceRoomsSeeder::class,
             NotificationsSeeder::class,
         ]);
     }

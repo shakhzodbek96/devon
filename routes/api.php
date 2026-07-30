@@ -3,6 +3,8 @@
 use App\Http\Controllers\Api\AuditController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CertificateController;
+use App\Http\Controllers\Api\ConferenceBookingController;
+use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\DocumentTemplateController;
 use App\Http\Controllers\Api\EmployeeController;
@@ -127,6 +129,20 @@ Route::prefix('v1')->group(function () {
         Route::post('/tasks/{uuid}/clarification-answer', [TaskController::class, 'answerClarification']);
         Route::post('/tasks/{uuid}/submit', [TaskController::class, 'submit']);
         Route::post('/tasks/{uuid}/review', [TaskController::class, 'review']);
+
+        // Conference-room booking (PLAN_conference-room.md §3, Tier 2 —
+        // simplest new module). Room CRUD gated by `conference-rooms.manage`;
+        // booking itself is unrestricted (any authenticated employee), with
+        // per-booking cancel authorization enforced inside
+        // `ConferenceBookingService`, not here.
+        Route::get('/conference-rooms', [ConferenceRoomController::class, 'index']);
+        Route::post('/conference-rooms', [ConferenceRoomController::class, 'store'])->middleware('can:conference-rooms.manage');
+        Route::patch('/conference-rooms/{uuid}', [ConferenceRoomController::class, 'update'])->middleware('can:conference-rooms.manage');
+        Route::delete('/conference-rooms/{uuid}', [ConferenceRoomController::class, 'destroy'])->middleware('can:conference-rooms.manage');
+
+        Route::get('/conference-bookings', [ConferenceBookingController::class, 'index']);
+        Route::post('/conference-bookings', [ConferenceBookingController::class, 'store']);
+        Route::post('/conference-bookings/{uuid}/cancel', [ConferenceBookingController::class, 'cancel']);
 
         Route::get('/me/notifications', [NotificationController::class, 'index']);
         Route::post('/notifications/{uuid}/read', [NotificationController::class, 'markRead']);

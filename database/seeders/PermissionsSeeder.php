@@ -40,6 +40,7 @@ class PermissionsSeeder extends Seeder
         'certificates.view',
         'certificates.upload',
         'certificates.manage',
+        'conference-rooms.manage',
     ];
 
     public function run(): void
@@ -57,6 +58,7 @@ class PermissionsSeeder extends Seeder
             'audit.view', 'units.view', 'units.create', 'units.update',
             'employees.view', 'employees.create', 'employees.update', 'employees.terminate',
             'certificates.view', 'certificates.upload', 'certificates.manage',
+            'conference-rooms.manage',
         ]);
 
         $auditor = Role::findByName('ROLE_AUDITOR', 'web');
