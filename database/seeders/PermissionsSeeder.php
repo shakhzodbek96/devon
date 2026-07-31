@@ -39,6 +39,7 @@ class PermissionsSeeder extends Seeder
         'units.view',
         'units.create',
         'units.update',
+        'positions.manage',
         'employees.view',
         'employees.create',
         'employees.update',
@@ -66,7 +67,7 @@ class PermissionsSeeder extends Seeder
         $hrAdmin = Role::findByName('ROLE_HR_ADMIN', 'web');
         $hrAdmin->syncPermissions([
             'users.view', 'users.create', 'users.update', 'roles.view',
-            'audit.view', 'units.view', 'units.create', 'units.update',
+            'audit.view', 'units.view', 'units.create', 'units.update', 'positions.manage',
             'employees.view', 'employees.create', 'employees.update', 'employees.terminate',
             'certificates.view', 'certificates.upload', 'certificates.manage',
             'conference-rooms.manage',

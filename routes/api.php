@@ -53,6 +53,9 @@ Route::prefix('v1')->group(function () {
         Route::get('/audit', [AuditController::class, 'index'])->middleware('can:audit.view');
 
         Route::get('/positions', [PositionController::class, 'index']);
+        Route::post('/positions', [PositionController::class, 'store'])->middleware('can:positions.manage');
+        Route::patch('/positions/{id}', [PositionController::class, 'update'])->middleware('can:positions.manage');
+        Route::delete('/positions/{id}', [PositionController::class, 'destroy'])->middleware('can:positions.manage');
 
         Route::get('/units', [UnitController::class, 'index'])->middleware('can:units.view');
         Route::get('/units/{uuid}', [UnitController::class, 'show'])->middleware('can:units.view');

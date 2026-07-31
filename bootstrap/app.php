@@ -7,6 +7,7 @@ use App\Exceptions\ConferenceBookingValidationException;
 use App\Exceptions\DocumentValidationException;
 use App\Exceptions\EmployeeValidationException;
 use App\Exceptions\LetterValidationException;
+use App\Exceptions\PositionValidationException;
 use App\Exceptions\ProtocolValidationException;
 use App\Exceptions\TabelValidationException;
 use App\Exceptions\TaskValidationException;
@@ -32,6 +33,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // 'invalid-parent') so src/lib/api/units.ts can rethrow the same
         // `UnitValidationError` class the mock backend throws.
         $exceptions->render(function (UnitValidationException $e) {
+            return response()->json([
+                'code' => $e->errorCode,
+                'message' => $e->getMessage(),
+            ], 422);
+        });
+
+        // Position-catalogue business-rule violations — same 422
+        // `{ code, message }` shape; code is 'duplicate-name' | 'in-use',
+        // mapped to a localized message in src/lib/api/positions.ts.
+        $exceptions->render(function (PositionValidationException $e) {
             return response()->json([
                 'code' => $e->errorCode,
                 'message' => $e->getMessage(),
