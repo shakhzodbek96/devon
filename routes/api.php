@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ConferenceRoomController;
 use App\Http\Controllers\Api\DocumentController;
 use App\Http\Controllers\Api\DocumentTemplateController;
 use App\Http\Controllers\Api\EmployeeController;
+use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\LetterController;
 use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OfficeNetworkController;
@@ -36,6 +37,8 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::prefix('v1')->group(function () {
+    Route::get('/health', [HealthController::class, 'index']);
+
     Route::post('/auth/login', [AuthController::class, 'login']);
 
     Route::middleware('auth:sanctum')->group(function () {
